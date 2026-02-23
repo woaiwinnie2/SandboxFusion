@@ -24,7 +24,7 @@ import aiofiles
 import aiofiles.os
 import structlog
 
-from sandbox.utils.common import cached_context, random_cgroup_name
+from sandbox.utils.common import cached_context, random_cgroup_name, set_permissions_recursively
 
 logger = structlog.stdlib.get_logger()
 
@@ -54,8 +54,14 @@ async def tmp_overlayfs():
     tmpfs_dir = f'{base_dir}/tmpfs'
     upper_dir = f'{tmpfs_dir}/upper'
     work_dir = f'{tmpfs_dir}/work'
-    for sub_dir in [tmpfs_dir, merged_dir]:
+    workspace_dir = f'{base_dir}/Workspace'
+    knowledge_dir = f'{base_dir}/Knowledge'
+
+    for sub_dir in [tmpfs_dir, merged_dir, workspace_dir, knowledge_dir]:
         await aiofiles.os.makedirs(sub_dir)
+
+    set_permissions_recursively(workspace_dir, 0o777)
+    set_permissions_recursively(knowledge_dir, 0o777)
     # overlayfs requires work and upper dir to be non-overlayfs, see https://stackoverflow.com/questions/67198603/overlayfs-inside-docker-container
     await mount_tmpfs(tmpfs_dir)
     for sub_dir in [upper_dir, work_dir]:
@@ -71,10 +77,16 @@ async def tmp_overlayfs():
     await execute_command(['sudo', 'mount', '--rbind', '/dev', f'{merged_dir}/dev'])
     await execute_command(['cp', '/etc/hosts', f'{merged_dir}/etc/'])
     await execute_command(['cp', '/etc/resolv.conf', f'{merged_dir}/etc/'])
+    await execute_command(['sudo', 'mkdir', '-p', f'{merged_dir}/Workspace'])
+    await execute_command(['sudo', 'mkdir', '-p', f'{merged_dir}/Knowledge'])
+    await execute_command(['sudo', 'mount', '--bind', workspace_dir, f'{merged_dir}/Workspace'])
+    await execute_command(['sudo', 'mount', '--bind', knowledge_dir, f'{merged_dir}/Knowledge'])
 
     yield merged_dir
 
     # TODO: cleanup errors shouldn't interrupt other cleanups
+    await unmount_fs(f'{merged_dir}/Knowledge')
+    await unmount_fs(f'{merged_dir}/Workspace')
     await unmount_fs(f'{merged_dir}/dev')
     await unmount_fs(f'{merged_dir}/sys')
     await unmount_fs(f'{merged_dir}/proc')
@@ -114,16 +126,22 @@ async def tmp_cgroup(mem_limit: Optional[str] = None, cpu_limit: Optional[float]
 
     if mem_limit is not None:
         mem_group_name = f'sandbox_mem_{random_cgroup_name()}'
-        await execute_command(['sudo', 'cgcreate', '-g', f'memory:{mem_group_name}'])
-        await execute_command(['sudo', 'cgset', '-r', f'memory.limit_in_bytes={mem_limit}', mem_group_name])
-        groups.append(f'memory:{mem_group_name}')
+        try:
+            await execute_command(['sudo', 'cgcreate', '-g', f'memory:{mem_group_name}'])
+            await execute_command(['sudo', 'cgset', '-r', f'memory.limit_in_bytes={mem_limit}', mem_group_name])
+            groups.append(f'memory:{mem_group_name}')
+        except Exception as e:
+            logger.warning(f"Failed to create memory cgroup (likely v2 or permission issue): {e}. Proceeding without memory limit.")
 
     if cpu_limit is not None:
         cpu_group_name = f'sandbox_cpu_{random_cgroup_name()}'
-        await execute_command(['sudo', 'cgcreate', '-g', f'cpu:{cpu_group_name}'])
-        await execute_command(['sudo', 'cgset', '-r', f'cpu.cfs_quota_us={int(100000 * cpu_limit)}', cpu_group_name])
-        await execute_command(['sudo', 'cgset', '-r', f'cpu.cfs_period_us=100000', cpu_group_name])
-        groups.append(f'cpu:{cpu_group_name}')
+        try:
+            await execute_command(['sudo', 'cgcreate', '-g', f'cpu:{cpu_group_name}'])
+            await execute_command(['sudo', 'cgset', '-r', f'cpu.cfs_quota_us={int(100000 * cpu_limit)}', cpu_group_name])
+            await execute_command(['sudo', 'cgset', '-r', f'cpu.cfs_period_us=100000', cpu_group_name])
+            groups.append(f'cpu:{cpu_group_name}')
+        except Exception as e:
+            logger.warning(f"Failed to create cpu cgroup: {e}. Proceeding without CPU limit.")
     '''
     cpuset can make program use specifc cpu cores, which will improve performance for memory bound programs.
     this is not an important feature for now and thus disabled
