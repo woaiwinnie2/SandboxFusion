@@ -22,6 +22,15 @@ deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-backports main restricted
 deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe multiverse
 ' > /etc/apt/sources.list
 
+elif [ "$1" = "24.04" ]
+then
+
+    echo $'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-updates main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-backports main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-security main restricted universe multiverse
+' > /etc/apt/sources.list
+
 else
 
 echo "ubuntu version $1 not supported"
