@@ -115,8 +115,8 @@ dataset:
         verilogeval_machine: code_eval_verilogeval_machine
 sandbox:
   isolation: none
-  cleanup_process: false
-  restore_bash: false
+  cleanup_process: true
+  restore_bash: true
   max_concurrency: 34
 common:
   logging_color: true
