@@ -10,7 +10,7 @@ do
 done
 
 rm -f ~/.condarc
-conda create -n sandbox-runtime -y python=3.10
+conda create -n sandbox-runtime -y python=3.11
 
 source activate sandbox-runtime
 
@@ -19,12 +19,6 @@ if [ $USE_OFFICIAL_SOURCE -eq 0 ]; then
 fi
 
 pip install -r ./requirements.txt --ignore-requires-python
-
-# for NaturalCodeBench python problem 29
-python -c "import nltk; nltk.download('punkt')"
-
-# for CIBench nltk problems 
-python -c "import nltk; nltk.download('stopwords')"
 
 pip cache purge
 conda clean --all -y

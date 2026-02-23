@@ -1,0 +1,1 @@
+docker push woaiwinnie2/sandbox_latex:medium
