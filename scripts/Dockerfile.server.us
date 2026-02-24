@@ -1,5 +1,7 @@
 FROM code_sandbox:base
 
+SHELL ["/bin/bash", "-c"]
+
 COPY ./runtime/python ./runtime/python
 RUN cd ./runtime/python && bash install-python-runtime.sh us
 # fix pyqt error, see https://github.com/NVlabs/instant-ngp/discussions/300

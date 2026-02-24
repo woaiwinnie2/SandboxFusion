@@ -19,5 +19,5 @@ fi
 
 wget ${MIRROR}/${FILENAME}
 mkdir -p /root/.conda
-bash ${FILENAME} -b
+bash ${FILENAME} -b -p /root/miniconda3
 rm -f ${FILENAME}
